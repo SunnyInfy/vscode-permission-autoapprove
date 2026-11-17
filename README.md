@@ -95,6 +95,10 @@ task is finished.
 
 ## Installation
 
+For a complete Windows walkthrough (Python, install, configuration, logon startup, updates,
+and uninstall), see [docs/INSTALL-WINDOWS.md](docs/INSTALL-WINDOWS.md).
+
+
 ```powershell
 cd C:\Users\sunny\source\repos\vscode-permission-autoapprove
 py -m venv .venv

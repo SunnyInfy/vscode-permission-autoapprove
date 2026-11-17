@@ -83,7 +83,8 @@ def cmd_scan(args: argparse.Namespace, manager: ConfigManager) -> int:
     for snap in snapshots:
         decision = classifier.classify(snap)
         excerpt = " ".join(snap.dialog_text.split())[:120]
-        print(f"- [{snap.source}] native={snap.is_native_dialog} text: {excerpt}")
+        print(f"- [{snap.source}] native={snap.is_native_dialog} label: {snap.context_label[:120]!r}")
+        print(f"  text: {excerpt!r}")
         print("  buttons: " + ", ".join(b.label for b in snap.buttons))
         verdict = "APPROVE" if decision.approve else "skip"
         print(f"  decision: {verdict} ({decision.reason})")

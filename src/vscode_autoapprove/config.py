@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
@@ -19,11 +19,20 @@ DEFAULT_APPROVE_LABELS = (
 DEFAULT_DESTRUCTIVE_KEYWORDS = ("Delete", "Remove", "Revoke", "Reset", "Uninstall", "Reject")
 DEFAULT_NEGATION_MARKERS = ("No", "Not", "Don't", "Do not", "Cancel", "Deny", "Denied", "Restricted")
 DEFAULT_DISMISS_LABELS = (
-    "Cancel", "Deny", "Don't Allow", "Do Not Allow", "Not Now", "No", "Close", "Dismiss", "Later",
+    "Cancel", "Deny", "Don't Allow", "Do Not Allow", "Not Now", "No", "Skip", "Close", "Dismiss", "Later",
     "Restricted Mode",
 )
+DEFAULT_TERMINAL_MARKERS = ("Run in terminal",)
+DEFAULT_READ_ONLY_COMMANDS = (
+    "cd", "Set-Location", "Get-Location", "Get-ChildItem", "dir", "ls", "Get-Content", "cat", "type",
+    "Get-Item", "Test-Path", "Import-Csv", "Select-Object", "Where-Object", "Sort-Object", "Group-Object",
+    "Measure-Object", "Format-Table", "Format-List", "Out-String", "Write-Output", "echo", "Get-Date",
+)
 _LIST_FIELDS = frozenset(
-    {"target_processes", "approve_labels", "destructive_keywords", "negation_markers", "dismiss_labels"}
+    {
+        "target_processes", "approve_labels", "destructive_keywords", "negation_markers", "dismiss_labels",
+        "terminal_markers", "terminal_read_only_commands",
+    }
 )
 
 
@@ -95,6 +104,8 @@ class AppConfig:
     destructive_keywords: tuple[str, ...] = DEFAULT_DESTRUCTIVE_KEYWORDS
     negation_markers: tuple[str, ...] = DEFAULT_NEGATION_MARKERS
     dismiss_labels: tuple[str, ...] = DEFAULT_DISMISS_LABELS
+    terminal_markers: tuple[str, ...] = DEFAULT_TERMINAL_MARKERS
+    terminal_read_only_commands: tuple[str, ...] = DEFAULT_READ_ONLY_COMMANDS
     require_dialog_context: bool = True
     context_depth: int = 3
     max_clicks_per_minute: int = 6
@@ -136,6 +147,7 @@ class AppConfig:
         )
         _check(bool(self.target_processes), "'target_processes' must not be empty")
         _check(bool(self.approve_labels), "'approve_labels' must not be empty")
+        _check(bool(self.terminal_markers), "'terminal_markers' must not be empty")
         self.ocr.validate()
 
 
@@ -167,14 +179,14 @@ class ConfigManager:
         return AppConfig.from_dict(self._read_raw())
 
     def init(self) -> bool:
-        """Write the default config if no file exists. Returns True when a file was created."""
+        """Write a minimal config if no file exists. Returns True when a file was created."""
         if self.path.exists():
             return False
-        self._write(asdict(AppConfig()))
+        self._write({"enabled": True, "dry_run": False})
         return True
 
     def set_enabled(self, enabled: bool) -> None:
-        raw = self._read_raw() if self.path.exists() else asdict(AppConfig())
+        raw = self._read_raw() if self.path.exists() else {}
         raw["enabled"] = enabled
         AppConfig.from_dict(raw)  # validate before touching the file
         self._write(raw)

@@ -12,6 +12,9 @@ from .classifier import PermissionClassifier
 from .config import AppConfig
 from .models import Button, DialogSnapshot
 
+MAX_CONTAINER_BUTTONS = 8
+MAX_CONTAINER_TEXTS = 20
+
 
 @dataclass(frozen=True)
 class TargetWindow:
@@ -55,6 +58,8 @@ class UiaDialogDetector:
         seen: set[tuple[int, int, int, int]] = set()
         for button in candidates:
             container, is_dialog = self._find_container(button, window)
+            if container is None:
+                continue
             key = _rect_key(container)
             if key in seen:
                 continue
@@ -66,18 +71,22 @@ class UiaDialogDetector:
         label = _safe_text(button)
         return bool(label) and self._classifier.is_approve_label(label) and _is_actionable(button)
 
-    def _find_container(self, button: Any, window: Any) -> tuple[Any, bool]:
+    def _find_container(self, button: Any, window: Any) -> tuple[Any | None, bool]:
+        """Nearest small group (or Dialog) around the button; None if no bounded group exists."""
         node = button
         for _ in range(self._config.context_depth):
             parent = node.parent()
             if parent is None:
                 break
-            if _control_type(parent) == "Window":  # button sits directly in its top-level window
-                return window, False
+            if _control_type(parent) == "Window":
+                # Only a button placed directly in its top-level window may use that window as scope.
+                return (window, False) if node is button else (None, False)
             node = parent
             if _control_type(node) == "Dialog":
                 return node, True
-        return node, False
+            if _is_compact(node):
+                return node, False
+        return None, False
 
     def _snapshot(self, container: Any, is_dialog: bool, target: TargetWindow) -> DialogSnapshot:
         buttons: list[Button] = []
@@ -94,7 +103,15 @@ class UiaDialogDetector:
             buttons=tuple(buttons),
             source="uia",
             is_native_dialog=is_dialog,
+            context_label=_safe_text(container),
         )
+
+
+def _is_compact(element: Any) -> bool:
+    """A small group holding the approve button plus at least one sibling control."""
+    buttons = element.descendants(control_type="Button")
+    texts = element.descendants(control_type="Text")
+    return 2 <= len(buttons) <= MAX_CONTAINER_BUTTONS and len(texts) <= MAX_CONTAINER_TEXTS
 
 
 def _safe_text(element: Any) -> str:

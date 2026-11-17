@@ -40,6 +40,44 @@ def test_negated_labels_are_never_approved(classifier, label):
     assert not classifier.is_approve_label(label)
 
 
+def terminal(command, buttons=("Allow Once", "Skip", "Explain this command in a side chat")):
+    return DialogSnapshot(
+        app_name="Code.exe",
+        window_title="w",
+        dialog_text=command,
+        buttons=tuple(Button(label=b) for b in buttons),
+        source="uia",
+        context_label="Chat Confirmation Dialog Run in terminal",
+    )
+
+
+def test_read_only_terminal_command_is_approved_with_skip_as_dismiss(classifier):
+    command = (
+        "cd story-factory; Import-Csv tracking\\stories.csv | Select-Object story_id,status "
+        "| Format-Table -AutoSize | Out-String -Width 200"
+    )
+
+    decision = classifier.classify(terminal(command))
+
+    assert decision.approve
+    assert decision.button.label == "Allow Once"
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "Get-ChildItem | Remove-Item build -Recurse",
+        "Get-Content notes.txt > copy.txt",
+        "Get-Date; git push --force",
+        "echo $(Remove-Item x)",
+    ],
+)
+def test_terminal_commands_outside_the_read_only_allowlist_are_refused(classifier, command):
+    decision = classifier.classify(terminal(command))
+
+    assert not decision.approve
+
+
 def test_destructive_text_blocks_approval_even_with_approve_button(classifier):
     decision = classifier.classify(snap(["Continue", "Cancel"], text="Delete the cache folder?"))
 

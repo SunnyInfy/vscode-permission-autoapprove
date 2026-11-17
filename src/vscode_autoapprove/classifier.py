@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from .command_policy import is_read_only_command
 from .config import AppConfig
 from .models import Button, Decision, DialogSnapshot
 
@@ -46,6 +47,10 @@ class PermissionClassifier:
         if self._config.require_dialog_context and not (snapshot.is_native_dialog or has_dismiss):
             return Decision(False, "no dialog context (no native dialog or dismiss button)")
 
+        terminal_reason = self._terminal_rejection(snapshot)
+        if terminal_reason:
+            return Decision(False, terminal_reason)
+
         ranked: list[tuple[int, int, Button]] = []
         for index, button in enumerate(snapshot.buttons):
             norm = normalize_label(button.label)
@@ -77,4 +82,16 @@ class PermissionClassifier:
         for keyword in self._config.destructive_keywords:
             if _has_phrase(text, keyword):
                 return keyword
+        return None
+
+    def _terminal_rejection(self, snapshot: DialogSnapshot) -> str | None:
+        """Terminal-command prompts are approved only when the command is read-only."""
+        markers = self._config.terminal_markers
+        if not any(_has_phrase(snapshot.context_label, m) or _has_phrase(snapshot.dialog_text, m) for m in markers):
+            return None
+        command = snapshot.dialog_text
+        for marker in markers:
+            command = re.sub(re.escape(marker), " ", command, flags=re.IGNORECASE)
+        if not is_read_only_command(command, self._config.terminal_read_only_commands):
+            return "terminal command is not on the read-only allowlist"
         return None

@@ -25,6 +25,7 @@ class DialogSnapshot:
     buttons: tuple[Button, ...]
     source: str
     is_native_dialog: bool = False
+    context_label: str = ""
 
     @property
     def fingerprint(self) -> str:

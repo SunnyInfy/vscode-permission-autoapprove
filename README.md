@@ -38,7 +38,8 @@ Scope: Windows only, VS Code only. No ML classification and no statistics dashbo
 | `config.py` | Configuration Manager: defaults, partial overrides, validation, persistence |
 | `detector.py` | Dialog Detector (accessibility): Windows UI Automation via pywinauto |
 | `ocr_fallback.py` | OCR fallback: pyautogui screenshot, OpenCV preprocessing, pytesseract |
-| `classifier.py` | Permission Classifier: approve-label allowlist, destructive/negation guards |
+| `classifier.py` | Permission Classifier: approve-label allowlist, destructive/negation guards, terminal-command gate |
+| `command_policy.py` | Read-only command allowlist check for terminal-command prompts |
 | `clicker.py` | Auto Click Engine: UIA `invoke()` with mouse fallback, safety gates |
 | `logger.py` | Activity Logger: JSON Lines audit trail |
 | `monitor.py` | Poll loop logic (accessibility first, OCR only as fallback) |
@@ -56,10 +57,16 @@ A dialog is clicked only if **all** of these hold:
    (`Don't Allow`, `No, I don't trust`, `Continue in Restricted Mode`) never match.
 3. Neither the dialog text nor any button contains a destructive keyword
    (`Delete`, `Remove`, `Revoke`, `Reset`, `Uninstall`, `Reject`). Matching is whole-word.
-4. The dialog has context: a native dialog, or a visible dismiss button such as `Cancel`.
+4. The dialog has context: a native dialog, or a visible dismiss button such as `Cancel` or `Skip`.
    This keeps stray "OK" text in the editor from being clicked.
-5. The engine's gates pass: not in dry-run, not inside the per-dialog cooldown, and under
+5. Terminal-command prompts (`Run in terminal`) are approved only when every command in the
+   text is on `terminal_read_only_commands`, with no redirection (`>`, `<`), backticks, or `$(`.
+   Anything else, including `git commit`, `Remove-Item`, or an unreadable command, is refused.
+6. The engine's gates pass: not in dry-run, not inside the per-dialog cooldown, and under
    `max_clicks_per_minute`.
+
+Dialog scope is the nearest small group around the approve button (at most 8 buttons and
+20 text elements), so unrelated chat history never counts as dialog text.
 
 Every approval (and every dry-run "would click") is written to `activity.jsonl` with its
 timestamp, app, dialog text, and button. The OCR path uses pyautogui, whose fail-safe
@@ -90,7 +97,9 @@ Create your configuration file (it is not overwritten if it already exists):
 vscode-autoapprove init-config
 ```
 
-This creates `%APPDATA%\vscode-autoapprove\config.json`. The full reference is in
+This creates `%APPDATA%\vscode-autoapprove\config.json` containing only `enabled` and `dry_run`.
+Add just the keys you want to override; anything omitted uses the built-in defaults, so
+upgrades pick up new defaults automatically. The full reference is in
 [config/config.example.json](config/config.example.json).
 
 ## Usage
@@ -123,9 +132,11 @@ and check `log`, then `run`.
 | `approve_labels` | Allow, Approve, Continue, Trust, Yes, Grant Access, Accept, Confirm, OK | Allowlist, in priority order |
 | `destructive_keywords` | Delete, Remove, Revoke, Reset, Uninstall, Reject | Any whole-word hit blocks the dialog |
 | `negation_markers` | No, Not, Don't, Do not, Cancel, Deny, Denied, Restricted | Labels containing these are never approved |
-| `dismiss_labels` | Cancel, Deny, Don't Allow, Not Now, No, Close, Dismiss, Later, Restricted Mode | Used to confirm dialog context |
+| `dismiss_labels` | Cancel, Deny, Don't Allow, Not Now, No, Skip, Close, Dismiss, Later, Restricted Mode | Used to confirm dialog context |
 | `require_dialog_context` | `true` | Require a native dialog or a dismiss button |
-| `context_depth` | `3` | How many ancestors above a button are searched for its dialog container |
+| `context_depth` | `3` | How many ancestors above a button are searched for its small dialog group |
+| `terminal_markers` | `["Run in terminal"]` | Phrases that mark a terminal-command prompt; must not be empty |
+| `terminal_read_only_commands` | cd, Get-ChildItem, Get-Content, Import-Csv, Select-Object, Format-Table, ... | Commands allowed in terminal prompts; empty list disables terminal approvals |
 | `max_clicks_per_minute` | `6` | Rate limit across all dialogs |
 | `cooldown_seconds` | `10` | Minimum time before clicking the same dialog again |
 | `ocr.enabled` | `false` | Enable the OCR fallback |
@@ -145,6 +156,10 @@ Changes to everything except `enabled` take effect after restarting `run`.
   not in the accessibility tree, which is the case the OCR fallback (`scan --ocr`) is for.
 - The OCR fallback heuristics (row and context bands) are less precise than UIA. Keep it
   disabled unless you need it, and check `log` after enabling it.
+- Terminal prompts: some VS Code versions expose the command as a text element, others only
+  inside the dialog's accessible name, prefixed by a description. When the command cannot be
+  read cleanly, the tool refuses it. That's deliberate, so check `scan` output before relying
+  on terminal approvals.
 
 ## Running at logon and across sessions
 

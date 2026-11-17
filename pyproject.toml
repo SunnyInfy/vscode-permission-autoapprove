@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vscode-permission-autoapprove"
+version = "0.1.0"
+description = "Windows tool that auto-approves allowlisted VS Code permission dialogs."
+requires-python = ">=3.10"
+dependencies = [
+    "pywinauto>=0.6.8",
+    "pyautogui>=0.9.54",
+    "pytesseract>=0.3.10",
+    "opencv-python>=4.8",
+    "numpy>=1.26",
+    "psutil>=5.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+vscode-autoapprove = "vscode_autoapprove.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

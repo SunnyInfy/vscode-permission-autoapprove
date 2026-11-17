@@ -1,0 +1,59 @@
+{
+  "enabled": true,
+  "dry_run": false,
+  "target_processes": [
+    "Code.exe"
+  ],
+  "poll_interval_seconds": 1.0,
+  "approve_labels": [
+    "Allow",
+    "Approve",
+    "Continue",
+    "Trust",
+    "Yes",
+    "Grant Access",
+    "Accept",
+    "Confirm",
+    "OK"
+  ],
+  "destructive_keywords": [
+    "Delete",
+    "Remove",
+    "Revoke",
+    "Reset",
+    "Uninstall",
+    "Reject"
+  ],
+  "negation_markers": [
+    "No",
+    "Not",
+    "Don't",
+    "Do not",
+    "Cancel",
+    "Deny",
+    "Denied",
+    "Restricted"
+  ],
+  "dismiss_labels": [
+    "Cancel",
+    "Deny",
+    "Don't Allow",
+    "Do Not Allow",
+    "Not Now",
+    "No",
+    "Close",
+    "Dismiss",
+    "Later",
+    "Restricted Mode"
+  ],
+  "require_dialog_context": true,
+  "context_depth": 3,
+  "max_clicks_per_minute": 6,
+  "cooldown_seconds": 10.0,
+  "ocr": {
+    "enabled": false,
+    "interval_seconds": 3.0,
+    "min_confidence": 60.0,
+    "tesseract_cmd": ""
+  }
+}

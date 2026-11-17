@@ -14,7 +14,14 @@ from .config import ConfigError, ConfigManager, default_config_path, default_loc
 from .detector import UiaDialogDetector
 from .logger import ActivityLogger
 from .ocr_fallback import OcrDetector
-from .runtime import SingleInstanceLock, build_monitor, enable_dpi_awareness, enabled_checker, run_forever
+from .runtime import (
+    SingleInstanceLock,
+    build_monitor,
+    enable_dpi_awareness,
+    flag_checker,
+    is_watcher_running,
+    run_forever,
+)
 from .startup import install_startup, startup_script_path, uninstall_startup
 
 Handler = Callable[[argparse.Namespace, ConfigManager], int]
@@ -33,6 +40,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("enable", help="Enable auto-approval (takes effect on the next poll).")
     sub.add_parser("disable", help="Disable auto-approval (takes effect on the next poll).")
+    unrestricted = sub.add_parser(
+        "unrestricted",
+        help="Approve destructive and terminal prompts without checks (takes effect on the next poll).",
+    )
+    unrestricted.add_argument("state", choices=["on", "off"])
+    unrestricted.add_argument("--confirm", action="store_true", help="Required to turn unrestricted mode on.")
     sub.add_parser("status", help="Show configuration and runtime state.")
     sub.add_parser("init-config", help="Create the default config file if missing.")
     log = sub.add_parser("log", help="Show recent approval actions.")
@@ -53,8 +66,15 @@ def cmd_run(args: argparse.Namespace, manager: ConfigManager) -> int:
         return 1
     try:
         enable_dpi_awareness()
-        monitor = build_monitor(config, ActivityLogger(default_log_path()), enabled_checker(manager, config.enabled))
+        monitor = build_monitor(
+            config,
+            ActivityLogger(default_log_path()),
+            flag_checker(manager, "enabled", config.enabled),
+            flag_checker(manager, "unrestricted", config.unrestricted),
+        )
         print(f"Watching {', '.join(config.target_processes)} (dry_run={config.dry_run}). Ctrl+C to stop.")
+        if config.unrestricted:
+            print("WARNING: unrestricted mode is ON. Destructive and terminal prompts are being approved.")
         run_forever(monitor, config.poll_interval_seconds)
     except KeyboardInterrupt:
         print("Stopped.")
@@ -103,15 +123,30 @@ def cmd_disable(args: argparse.Namespace, manager: ConfigManager) -> int:
     return 0
 
 
+def cmd_unrestricted(args: argparse.Namespace, manager: ConfigManager) -> int:
+    if args.state == "off":
+        manager.set_flag("unrestricted", False)
+        print("Unrestricted mode OFF. Destructive and terminal prompts are checked again.")
+        return 0
+    if not args.confirm:
+        print(
+            "Unrestricted mode approves destructive and non-read-only prompts without checking them.\n"
+            "To turn it on, run: vscode-autoapprove unrestricted on --confirm",
+            file=sys.stderr,
+        )
+        return 1
+    manager.set_flag("unrestricted", True)
+    print(f"Unrestricted mode ON ({manager.path}). A running watcher applies this on its next poll.")
+    return 0
+
+
 def cmd_status(args: argparse.Namespace, manager: ConfigManager) -> int:
     config = manager.load()
-    lock = SingleInstanceLock(default_lock_path())
-    running = not lock.acquire()
-    if not running:
-        lock.release()
+    running = is_watcher_running(default_lock_path())
     print(f"config:       {manager.path} ({'exists' if manager.path.exists() else 'defaults in use'})")
     print(f"enabled:      {config.enabled}")
     print(f"dry_run:      {config.dry_run}")
+    print(f"unrestricted: {config.unrestricted}")
     print(f"ocr fallback: {config.ocr.enabled}")
     print(f"running:      {running}")
     print(f"activity log: {default_log_path()}")
@@ -151,6 +186,7 @@ HANDLERS: dict[str, Handler] = {
     "scan": cmd_scan,
     "enable": cmd_enable,
     "disable": cmd_disable,
+    "unrestricted": cmd_unrestricted,
     "status": cmd_status,
     "log": cmd_log,
     "init-config": cmd_init_config,

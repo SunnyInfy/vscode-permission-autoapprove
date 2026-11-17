@@ -85,13 +85,36 @@ def test_destructive_text_blocks_approval_even_with_approve_button(classifier):
     assert "destructive" in decision.reason
 
 
+def test_unrestricted_approves_destructive_and_terminal_prompts_but_not_negated_ones():
+    classifier = PermissionClassifier(AppConfig(), unrestricted=lambda: True)
+
+    destructive = classifier.classify(snap(["Continue", "Cancel"], text="Delete the cache folder?"))
+    risky_command = classifier.classify(terminal("Remove-Item build -Recurse; git push --force"))
+    negated = classifier.classify(snap(["Don't Allow", "Cancel"]))
+
+    assert destructive.approve
+    assert destructive.reason.endswith("[unrestricted]")
+    assert risky_command.approve
+    assert not negated.approve
+
+
 def test_destructive_button_label_blocks_approval(classifier):
     decision = classifier.classify(snap(["Remove", "Allow", "Cancel"]))
 
     assert not decision.approve
 
 
-def test_requires_dialog_context_unless_native(classifier):
+def test_destructive_word_in_container_label_blocks_approval(classifier):
+    labelled = DialogSnapshot(
+        app_name="Code.exe",
+        window_title="w",
+        dialog_text="",
+        buttons=(Button("Continue"), Button("Cancel")),
+        source="uia",
+        context_label="Delete the cache folder?",
+    )
+
+    assert not classifier.classify(labelled).approve
     assert not classifier.classify(snap(["OK"])).approve
     assert classifier.classify(snap(["OK"], native=True)).approve
 

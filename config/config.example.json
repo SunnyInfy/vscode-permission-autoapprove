@@ -1,6 +1,7 @@
 {
   "enabled": true,
   "dry_run": false,
+  "unrestricted": false,
   "target_processes": [
     "Code.exe"
   ],

@@ -72,6 +72,18 @@ Every approval (and every dry-run "would click") is written to `activity.jsonl` 
 timestamp, app, dialog text, and button. The OCR path uses pyautogui, whose fail-safe
 (moving the mouse to a screen corner) cancels a click by raising an error.
 
+### Unrestricted mode (opt-in, dangerous)
+
+`vscode-autoapprove unrestricted on --confirm` skips the destructive-keyword check and the
+terminal read-only allowlist. Every other rule still applies: approve labels, dialog context,
+and negated labels such as "Don't Allow" are still refused. Each approval made this way is
+tagged `[unrestricted]` in the log.
+
+With it on, a running watcher will approve prompts to delete files, reset repositories,
+force-push, or run any shell command, even when you are not watching. It is off by default
+and stays on until you run `vscode-autoapprove unrestricted off`. Turn it off as soon as the
+task is finished.
+
 ## Requirements
 
 - Windows 10 or 11
@@ -110,7 +122,8 @@ upgrades pick up new defaults automatically. The full reference is in
 | `vscode-autoapprove scan --ocr` | Same, also running the OCR fallback |
 | `vscode-autoapprove run --dry-run` | Watch and log what would be approved, without clicking |
 | `vscode-autoapprove run` | Watch VS Code and auto-approve allowlisted dialogs (Ctrl+C to stop) |
-| `vscode-autoapprove enable` / `disable` | Toggle auto-approval; a running watcher picks it up on its next poll |
+| `vscode-autoapprove disable` / `enable` | Toggle auto-approval; a running watcher picks it up on its next poll |
+| `vscode-autoapprove unrestricted on --confirm` / `off` | Approve destructive and terminal prompts without checks (see Safety); a running watcher picks it up on its next poll |
 | `vscode-autoapprove log -n 20` | Show the most recent approval actions |
 | `vscode-autoapprove status` | Show config path, enabled/dry-run state, and whether a watcher is running |
 | `vscode-autoapprove install-startup` | Start the watcher automatically at Windows logon |
@@ -127,6 +140,7 @@ and check `log`, then `run`.
 | --- | --- | --- |
 | `enabled` | `true` | Master switch; read on every poll |
 | `dry_run` | `false` | Log decisions without clicking (`run --dry-run` overrides) |
+| `unrestricted` | `false` | Skip destructive-keyword and terminal allowlist checks; use `unrestricted on --confirm` (see Safety) |
 | `target_processes` | `["Code.exe"]` | Process names whose windows are monitored |
 | `poll_interval_seconds` | `1.0` | Delay between polls |
 | `approve_labels` | Allow, Approve, Continue, Trust, Yes, Grant Access, Accept, Confirm, OK | Allowlist, in priority order |

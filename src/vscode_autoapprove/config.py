@@ -36,6 +36,9 @@ _LIST_FIELDS = frozenset(
 )
 
 
+RUNTIME_FLAGS = frozenset({"enabled", "unrestricted"})
+
+
 class ConfigError(ValueError):
     """The configuration file is malformed or holds an invalid value."""
 
@@ -98,6 +101,7 @@ class OcrConfig:
 class AppConfig:
     enabled: bool = True
     dry_run: bool = False
+    unrestricted: bool = False
     target_processes: tuple[str, ...] = ("Code.exe",)
     poll_interval_seconds: float = 1.0
     approve_labels: tuple[str, ...] = DEFAULT_APPROVE_LABELS
@@ -130,7 +134,7 @@ class AppConfig:
         return config
 
     def validate(self) -> None:
-        for name in ("enabled", "dry_run", "require_dialog_context"):
+        for name in ("enabled", "dry_run", "unrestricted", "require_dialog_context"):
             _check(isinstance(getattr(self, name), bool), f"'{name}' must be true or false")
         _check(
             _is_number(self.poll_interval_seconds) and self.poll_interval_seconds > 0,
@@ -186,8 +190,12 @@ class ConfigManager:
         return True
 
     def set_enabled(self, enabled: bool) -> None:
+        self.set_flag("enabled", enabled)
+
+    def set_flag(self, name: str, value: bool) -> None:
+        _check(name in RUNTIME_FLAGS, f"Unknown flag '{name}'")
         raw = self._read_raw() if self.path.exists() else {}
-        raw["enabled"] = enabled
+        raw[name] = value
         AppConfig.from_dict(raw)  # validate before touching the file
         self._write(raw)
 

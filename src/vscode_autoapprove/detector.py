@@ -14,6 +14,7 @@ from .models import Button, DialogSnapshot
 
 MAX_CONTAINER_BUTTONS = 8
 MAX_CONTAINER_TEXTS = 20
+WINDOW_CHROME_LABELS = frozenset({"Minimize", "Maximize", "Restore", "Close"})
 
 
 @dataclass(frozen=True)
@@ -89,9 +90,12 @@ class UiaDialogDetector:
         return None, False
 
     def _snapshot(self, container: Any, is_dialog: bool, target: TargetWindow) -> DialogSnapshot:
+        window_scope = container is target.wrapper
         buttons: list[Button] = []
         for child in container.descendants(control_type="Button"):
             label = _safe_text(child)
+            if window_scope and label in WINDOW_CHROME_LABELS:
+                continue  # title-bar controls must not count as dialog context
             if label and _is_actionable(child):
                 buttons.append(Button(label=label, center=_center(child), source="uia", ref=child))
 

@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 from vscode_autoapprove.config import AppConfig
 from vscode_autoapprove.classifier import PermissionClassifier
-from vscode_autoapprove.detector import UiaDialogDetector
+from vscode_autoapprove.detector import TargetWindow, UiaDialogDetector
 
 
 class FakeElement:
@@ -19,6 +19,15 @@ class FakeElement:
 
     def window_text(self):
         return self._name
+
+    def is_visible(self):
+        return True
+
+    def is_enabled(self):
+        return True
+
+    def rectangle(self):
+        return SimpleNamespace(left=0, top=0, right=10, bottom=10)
 
     def descendants(self, control_type=None):
         found, stack = [], list(self._children)
@@ -83,3 +92,17 @@ def test_button_inside_large_unbounded_area_is_ignored():
     container, _ = make_detector()._find_container(stray, window)
 
     assert container is None
+
+
+def test_title_bar_close_is_not_dialog_context():
+    window = FakeElement("Window", "Some popup")
+    FakeElement("Button", "Allow", parent=window)
+    FakeElement("Button", "Close", parent=window)
+    config = AppConfig()
+    detector = UiaDialogDetector(config, PermissionClassifier(config))
+    target = TargetWindow("Code.exe", "Some popup", window)
+
+    snapshot = detector._snapshot(window, False, target)
+
+    assert [b.label for b in snapshot.buttons] == ["Allow"]
+    assert not PermissionClassifier(config).classify(snapshot).approve

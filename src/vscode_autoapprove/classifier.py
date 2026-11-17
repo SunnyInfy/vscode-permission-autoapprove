@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 
 from .command_policy import is_read_only_command
 from .config import AppConfig
@@ -27,8 +28,9 @@ def _starts_with_phrase(text: str, phrase: str) -> bool:
 
 
 class PermissionClassifier:
-    def __init__(self, config: AppConfig) -> None:
+    def __init__(self, config: AppConfig, unrestricted: Callable[[], bool] = lambda: False) -> None:
         self._config = config
+        self._unrestricted = unrestricted
 
     def is_approve_label(self, label: str) -> bool:
         norm = normalize_label(label)
@@ -38,16 +40,18 @@ class PermissionClassifier:
         if not snapshot.buttons:
             return Decision(False, "no buttons")
 
-        for text in (snapshot.dialog_text, *(b.label for b in snapshot.buttons)):
-            keyword = self._destructive_hit(text)
-            if keyword:
-                return Decision(False, f"destructive keyword '{keyword}'")
+        unrestricted = self._unrestricted()
+        if not unrestricted:
+            for text in (snapshot.context_label, snapshot.dialog_text, *(b.label for b in snapshot.buttons)):
+                keyword = self._destructive_hit(text)
+                if keyword:
+                    return Decision(False, f"destructive keyword '{keyword}'")
 
         has_dismiss = any(self._is_dismiss(b.label) for b in snapshot.buttons)
         if self._config.require_dialog_context and not (snapshot.is_native_dialog or has_dismiss):
             return Decision(False, "no dialog context (no native dialog or dismiss button)")
 
-        terminal_reason = self._terminal_rejection(snapshot)
+        terminal_reason = None if unrestricted else self._terminal_rejection(snapshot)
         if terminal_reason:
             return Decision(False, terminal_reason)
 
@@ -63,7 +67,8 @@ class PermissionClassifier:
             return Decision(False, "no approved button label")
 
         _, _, best = min(ranked, key=lambda item: (item[0], item[1]))
-        return Decision(True, f"approved label '{best.label}'", best)
+        suffix = " [unrestricted]" if unrestricted else ""
+        return Decision(True, f"approved label '{best.label}'{suffix}", best)
 
     def _approve_rank(self, norm: str) -> int | None:
         for rank, phrase in enumerate(self._config.approve_labels):

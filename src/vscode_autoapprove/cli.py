@@ -23,6 +23,7 @@ from .runtime import (
     run_forever,
 )
 from .startup import install_startup, startup_script_path, uninstall_startup
+from .watcher import WatcherError, start_background, stop_watcher
 
 Handler = Callable[[argparse.Namespace, ConfigManager], int]
 
@@ -40,6 +41,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("enable", help="Enable auto-approval (takes effect on the next poll).")
     sub.add_parser("disable", help="Disable auto-approval (takes effect on the next poll).")
+    start = sub.add_parser("start", help="Start the watcher in the background.")
+    start.add_argument("--dry-run", action="store_true", help="Log decisions without clicking.")
+    sub.add_parser("stop", help="Stop the background watcher.")
+    restart = sub.add_parser("restart", help="Stop, then start the background watcher.")
+    restart.add_argument("--dry-run", action="store_true", help="Log decisions without clicking.")
     unrestricted = sub.add_parser(
         "unrestricted",
         help="Approve destructive and terminal prompts without checks (takes effect on the next poll).",
@@ -109,6 +115,28 @@ def cmd_scan(args: argparse.Namespace, manager: ConfigManager) -> int:
         verdict = "APPROVE" if decision.approve else "skip"
         print(f"  decision: {verdict} ({decision.reason})")
     return 0
+
+
+def cmd_start(args: argparse.Namespace, manager: ConfigManager) -> int:
+    try:
+        process = start_background(args.dry_run, args.config)
+    except WatcherError as exc:
+        print(f"Could not start the watcher: {exc}", file=sys.stderr)
+        return 1
+    mode = "dry-run (no clicks)" if args.dry_run else "live"
+    print(f"Watcher started in the background (PID {process.pid}), {mode}.")
+    return 0
+
+
+def cmd_stop(args: argparse.Namespace, manager: ConfigManager) -> int:
+    pid = stop_watcher()
+    print(f"Watcher stopped (PID {pid})." if pid else "The watcher is not running.")
+    return 0
+
+
+def cmd_restart(args: argparse.Namespace, manager: ConfigManager) -> int:
+    stop_watcher()
+    return cmd_start(args, manager)
 
 
 def cmd_enable(args: argparse.Namespace, manager: ConfigManager) -> int:
@@ -186,6 +214,9 @@ HANDLERS: dict[str, Handler] = {
     "scan": cmd_scan,
     "enable": cmd_enable,
     "disable": cmd_disable,
+    "start": cmd_start,
+    "stop": cmd_stop,
+    "restart": cmd_restart,
     "unrestricted": cmd_unrestricted,
     "status": cmd_status,
     "log": cmd_log,

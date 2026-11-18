@@ -295,6 +295,20 @@ The second command deletes your config and activity history. Skip it if you want
 | Clicks don't register | VS Code window minimized or hidden | Bring VS Code to the front once |
 | `pip install` fails building a package | Old pip, or no network access | Run `python -m pip install --upgrade pip` and retry |
 
+## Build and share the exe (for the person sharing)
+
+Build a self-contained `dist\vscode-autoapprove.exe` (about 78 MB, no Python needed on the
+target PC). Run this from the project folder, after `Setup-AutoApprove.ps1 install`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\packaging\build_exe.ps1
+```
+
+Share only `dist\vscode-autoapprove.exe` and point friends to
+[FRIENDS-QUICKSTART.md](FRIENDS-QUICKSTART.md). Do not share your `config.json` or
+`activity.jsonl`; they are personal to your machine. Unsigned exes can trigger SmartScreen or
+antivirus warnings, so mention that when you share it.
+
 ## Where files live
 
 | Item | Location |

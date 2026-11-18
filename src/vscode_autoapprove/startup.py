@@ -17,11 +17,16 @@ def startup_script_path() -> Path:
 
 
 def build_vbs(python_exe: str, config_path: Path | None = None) -> str:
-    pythonw = Path(python_exe).with_name("pythonw.exe")
-    interpreter = str(pythonw) if pythonw.exists() else python_exe
-    command = f'"{interpreter}" -m vscode_autoapprove run'
+    if getattr(sys, "frozen", False):  # packaged exe: launch the exe itself
+        interpreter_parts = [f'"{python_exe}"']
+    else:
+        pythonw = Path(python_exe).with_name("pythonw.exe")
+        interpreter = str(pythonw) if pythonw.exists() else python_exe
+        interpreter_parts = [f'"{interpreter}"', "-m", "vscode_autoapprove"]
+    # --config is a top-level option, so it must come before the `run` subcommand.
     if config_path is not None:
-        command += f' --config "{config_path}"'
+        interpreter_parts += ["--config", f'"{config_path}"']
+    command = " ".join([*interpreter_parts, "run"])
     escaped = command.replace('"', '""')  # VBScript string literal escaping
     return f'CreateObject("WScript.Shell").Run "{escaped}", 0, False\r\n'
 

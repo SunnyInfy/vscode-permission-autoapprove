@@ -96,7 +96,8 @@ task is finished.
 ## Installation
 
 For a complete Windows walkthrough (Python, install, configuration, logon startup, updates,
-and uninstall), see [docs/INSTALL-WINDOWS.md](docs/INSTALL-WINDOWS.md).
+and uninstall), see [docs/INSTALL-WINDOWS.md](docs/INSTALL-WINDOWS.md). To give the tool to a
+friend without Python, see [docs/FRIENDS-QUICKSTART.md](docs/FRIENDS-QUICKSTART.md).
 
 
 ```powershell
